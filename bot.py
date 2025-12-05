@@ -1,15 +1,31 @@
-import os
-import telebot
-from telebot import types
+import logging
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+# ===================== НАСТРОЙКИ =====================
+
+# ВСТАВЬ СВОЙ ТОКЕН БОТА (из BotFather)
 BOT_TOKEN = "8590224138:AAH_GaHndks2jFJjq37vAwSeykbu4mY_m3o"
+
+# ВСТАВЬ СВОЙ ADMIN_ID (число из @userinfobot)
 ADMIN_ID = 237980454
-bot = telebot.TeleBot(BOT_TOKEN)
+
+# =====================================================
+
+logging.basicConfig(level=logging.INFO)
+
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher(bot)
+
+# Состояния пользователей: user_states[user_id] = {"index": int}
 user_states = {}
+
 
 def get_state(user_id: int) -> dict:
     if user_id not in user_states:
         user_states[user_id] = {"index": 0}
     return user_states[user_id]
+
 
 STEPS = [
     {
@@ -228,7 +244,7 @@ STEPS = [
         "kind": "media",
         "name": "Финальное аудио у ёлки",
         "prompt": (
-            "Валюха, ты прошла весь маршрут:\n"
+            "Валентина Петровна, вы прошли весь маршрут:\n"
             "от Ленина до Медного всадника, от Адмиралтейства до Петропавловской крепости.\n\n"
             "Остался последний шаг.\n\n"
             "У ёлки (или в центре ТЦ) запиши аудио в штаб со словами:\n"
@@ -248,44 +264,43 @@ STEPS = [
 ]
 
 
-def send_step_prompt(user_id: int):
+async def send_step_prompt(user_id: int):
     state = get_state(user_id)
     idx = state["index"]
     if idx >= len(STEPS):
         return
     step = STEPS[idx]
-    bot.send_message(user_id, step["prompt"])
+    await bot.send_message(user_id, step["prompt"])
 
 
-@bot.message_handler(commands=["start"])
-def handle_start(message: types.Message):
+@dp.message_handler(commands=["start"])
+async def handle_start(message: types.Message):
     user_id = message.from_user.id
     user_states[user_id] = {"index": 0}
     greeting = (
         "Штаб ТТ БУБУ:\n\n"
-        "Если ты читаешь это, значит, уже нашла конверт в ресторане и готова к операции.\n\n"
-        "Отвечай на загадки, доезжай до точек, снимай кринж — всё по плану ТТ БУБУ.\n\n"
+        "Если ты читаешь это, значит уже нашла конверт в ресторане и готова к операции.\n\n"
+        "Отвечай на загадки, доезжай до точек, снимай кринж — всё по плану ТТ БУБУ.\n"
     )
-    bot.send_message(user_id, greeting)
-    send_step_prompt(user_id)
+    await message.answer(greeting)
+    await send_step_prompt(user_id)
 
 
-@bot.message_handler(commands=["help"])
-def handle_help(message: types.Message):
-    bot.reply_to(
-        message,
-        "Это квест-бот ТТ БУБУ Штаб.\n\n"
+@dp.message_handler(commands=["help"])
+async def handle_help(message: types.Message):
+    await message.answer(
+        "Это квест-бот ТТ БУБУ.\n\n"
         "• Он даёт загадку — ты отвечаешь.\n"
-        "• Потом даёт задание доехать и выполнить локационное задание.\n"
-        "• Я проверяю всё и даю следующее задание.\n\n"
-        "Если что-то не получается — пиши в штаб напрямую.",
+        "• Потом даёт задание доехать и снять медиа.\n"
+        "• Ведущий (Админ) всё проверяет и запускает следующий шаг.\n\n"
+        "Если что-то сломалось — пиши ведущему напрямую."
     )
 
 
-@bot.message_handler(content_types=["text"])
-def handle_text(message: types.Message):
+@dp.message_handler(content_types=["text"])
+async def handle_text(message: types.Message):
     user_id = message.from_user.id
-    text = message.text.strip()
+    text = (message.text or "").strip()
 
     if text.startswith("/"):
         return
@@ -293,55 +308,51 @@ def handle_text(message: types.Message):
     state = get_state(user_id)
     idx = state["index"]
     if idx >= len(STEPS):
-        bot.reply_to(message, "Квест уже завершён.")
+        await message.reply("Квест уже завершён.")
         return
 
     step = STEPS[idx]
 
     if step["kind"] != "text_answer":
-        bot.reply_to(
-            message,
-            "Штаб ТТ БУБУ сейчас ждёт не текст, а медиа с точки (фото/видео/голос). "
+        await message.reply(
+            "Сейчас штаб ТТ БУБУ ждёт не текст, а медиа с точки (фото/видео/голос). "
             "Посмотри последнее задание."
         )
         return
 
     normalized = text.lower().strip()
     if normalized in step["answers"]:
-        bot.reply_to(message, "Правильно. Штаб подтверждает.\n")
+        await message.reply("Правильно. Штаб подтверждает.\n")
         state["index"] += 1
-        send_step_prompt(user_id)
+        await send_step_prompt(user_id)
     else:
-        bot.reply_to(
-            message,
+        await message.reply(
             "Ответ не сходится с данными штаба ТТ БУБУ.\n"
-            "Попробуй ещё раз. Можно сформулировать по-другому."
+            "Попробуй ещё раз. Можно сформулировать по-другому, но по сути то же место/значение."
         )
 
 
-@bot.message_handler(content_types=["photo", "video", "voice"])
-def handle_media(message: types.Message):
+@dp.message_handler(content_types=["photo", "video", "voice"])
+async def handle_media(message: types.Message):
     user_id = message.from_user.id
     state = get_state(user_id)
     idx = state["index"]
     if idx >= len(STEPS):
-        bot.reply_to(message, "Квест уже завершён.")
+        await message.reply("Квест уже завершён.")
         return
 
     step = STEPS[idx]
 
-    if step["kind"] not in ("media",):
-        bot.reply_to(
-            message,
+    if step["kind"] != "media":
+        await message.reply(
             "Сейчас штаб ТТ БУБУ ждал текстовый ответ, а не медиа.\n"
             "Посмотри, что написано в последнем сообщении бота."
         )
         return
 
-    bot.reply_to(
-        message,
-        "Штаб получил твоё видео/фото/аудио.\n"
-        "Передаём на проверку. Жди решения штаба."
+    await message.reply(
+        "Штаб получил твоё медиа.\n"
+        "Передаём ведущему на проверку. Жди решения."
     )
 
     caption = (
@@ -349,75 +360,86 @@ def handle_media(message: types.Message):
         f"Если всё ок — нажми ✅, если нет — ❌."
     )
 
-    kb = types.InlineKeyboardMarkup()
-    approve_btn = types.InlineKeyboardButton(
-        "✅ Одобрить", callback_data=f"approve:{user_id}:{idx}"
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton(
+            "✅ Одобрить", callback_data=f"approve:{user_id}:{idx}"
+        ),
+        InlineKeyboardButton(
+            "❌ Переснять", callback_data=f"reject:{user_id}:{idx}"
+        ),
     )
-    reject_btn = types.InlineKeyboardButton(
-        "❌ Переснять", callback_data=f"reject:{user_id}:{idx}"
-    )
-    kb.add(approve_btn, reject_btn)
 
-    bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
-    bot.send_message(ADMIN_ID, caption, reply_markup=kb)
+    # Пересылаем медиа админу
+    try:
+        await message.forward(ADMIN_ID)
+    except Exception as e:
+        logging.error(f"Ошибка при пересылке медиа админу: {e}")
+
+    await bot.send_message(ADMIN_ID, caption, reply_markup=kb)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith(("approve:", "reject:")))
-def handle_approve_reject(call: types.CallbackQuery):
+@dp.callback_query_handler(lambda c: c.data.startswith(("approve:", "reject:")))
+async def handle_approve_reject(call: types.CallbackQuery):
     if call.from_user.id != ADMIN_ID:
-        bot.answer_callback_query(call.id, "Ты не главный в ТТ БУБУ.")
+        await call.answer("Ты не ведущий ТТ БУБУ.")
         return
 
-    action, user_id_str, step_idx_str = call.data.split(":")
-    target_user_id = int(user_id_str)
-    step_idx = int(step_idx_str)
+    try:
+        action, user_id_str, step_idx_str = call.data.split(":")
+        target_user_id = int(user_id_str)
+        step_idx = int(step_idx_str)
+    except Exception:
+        await call.answer("Ошибка данных callback.")
+        return
 
     state = get_state(target_user_id)
 
     if state["index"] != step_idx:
-        bot.answer_callback_query(
-            call.id,
-            f"Игрок уже на другом шаге (текущий: {state['index']})."
+        await call.answer(
+            f"Игрок уже на другом шаге (текущий: {state['index']}).",
+            show_alert=False,
         )
         return
 
-    if action == "reject":
-        bot.answer_callback_query(call.id, "Попросили переснять.")
-        bot.send_message(
-            target_user_id,
-            "Штаб ТТ БУБУ сообщает: главнокомандующий попросил переснять медиа. "
-            "Попробуй ещё раз — ближе к объекту/чётче/громче."
-        )
-        bot.edit_message_reply_markup(
+    # Убираем кнопки у сообщения в чате админа
+    try:
+        await bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            reply_markup=None
+            reply_markup=None,
+        )
+    except Exception:
+        pass
+
+    if action == "reject":
+        await call.answer("Попросили переснять.")
+        await bot.send_message(
+            target_user_id,
+            "Штаб ТТ БУБУ сообщает: ведущий попросил переснять медиа. "
+            "Попробуй ещё раз — ближе к объекту/чётче/громче."
         )
         return
 
     if action == "approve":
-        bot.answer_callback_query(call.id, "Одобрено. Переходим дальше.")
-        bot.send_message(
+        await call.answer("Одобрено. Переходим дальше.")
+        await bot.send_message(
             target_user_id,
             "Штаб ТТ БУБУ: медиа одобрено. Двигаемся дальше."
-        )
-        bot.edit_message_reply_markup(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=None
         )
 
         state["index"] += 1
         idx = state["index"]
         if idx >= len(STEPS):
-            bot.send_message(
+            # Финал
+            await bot.send_message(
                 target_user_id,
                 "Квест завершён. Если ведущий рядом — жди вручения контейнера."
             )
         else:
-            send_step_prompt(target_user_id)
+            await send_step_prompt(target_user_id)
 
 
 if __name__ == "__main__":
     print("Bot started...")
-    bot.infinity_polling()
+    executor.start_polling(dp, skip_updates=True)
