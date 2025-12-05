@@ -350,7 +350,7 @@ async def handle_text(message: types.Message):
     normalized = text.lower().strip()
     if normalized in step["answers"]:
         # подтверждение
-        await message.reply("Правильно. Штаб подтверждает.\n")
+        await message.reply("Правильно. Штаб подтверждает. Двигайся туда, чтобы получить следуещее задание\n")
 
         # картинка, специфичная для этого шага (если есть)
         image_path = step.get("image")
@@ -360,12 +360,12 @@ async def handle_text(message: types.Message):
             except Exception as e:
                 logging.warning(f"Не удалось отправить картинку для шага {idx}: {e}")
 
-        # кнопка «Агент Валюха прибыл на место» для старта следующего этапа
+        # кнопка «Следующее задание» для старта следующего этапа
         kb = InlineKeyboardMarkup()
-        kb.add(InlineKeyboardButton("Агент Валюха прибыл на место", callback_data=f"go:{idx}"))
+        kb.add(InlineKeyboardButton("Следующее задание", callback_data=f"go:{idx}"))
 
         await message.answer(
-            "Как будешь на старте следующего этапа — жми «Агент Валюха прибыл на место», "
+            "Как будешь на старте следующего этапа — жми «Следующее задание», "
             "и штаб зафиксирует начало испытания.",
             reply_markup=kb,
         )
@@ -453,7 +453,7 @@ async def handle_go(call: types.CallbackQuery):
 
     await bot.send_message(
         ADMIN_ID,
-        f"Игрок {user_id} нажал «Агент Валюха прибыл на место». Начат этап {new_idx}: {step_name}.",
+        f"Игрок {user_id} нажал «Следующее задание». Начат этап {new_idx}: {step_name}.",
     )
 
     # отправляем игроку следующее задание или финал
