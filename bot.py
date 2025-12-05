@@ -1,16 +1,16 @@
 import logging
+import asyncio
+
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 
 # ===================== НАСТРОЙКИ =====================
 
-# ВСТАВЬ СВОЙ ТОКЕН БОТА (из BotFather)
+# ТОКЕН БОТА 
 BOT_TOKEN = "8590224138:AAH_GaHndks2jFJjq37vAwSeykbu4mY_m3o"
 
-# ВСТАВЬ СВОЙ ADMIN_ID (число из @userinfobot)
+# ADMIN_ID 
 ADMIN_ID = 237980454
-
-# =====================================================
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,6 +27,8 @@ def get_state(user_id: int) -> dict:
     return user_states[user_id]
 
 
+# ===================== КВЕСТ ЭТАПЫ =====================
+
 STEPS = [
     {
         "kind": "text_answer",
@@ -40,6 +42,8 @@ STEPS = [
             "Введи название этой площади."
         ),
         "answers": ["площадь ленина", "пл ленина", "пл. ленина", "ленина"],
+        # Картинка, которая придёт после правильного ответа на этот шаг
+        "image": "01.png",
     },
     {
         "kind": "media",
@@ -117,7 +121,7 @@ STEPS = [
         "name": "Адмиралтейство (фото)",
         "prompt": (
             "Валюха, ты такая умная. Всё верно.\n\n"
-            "Двигайся к Адмиралтейству и на месте сфотографируйся на фоне шпиля.\n"
+            "Двигайся к Адмиралтейству и на месте сфотографируйся оригинально на фоне здания и  шпиля.\n"
             "Отправь фото в штаб."
         ),
     },
@@ -174,7 +178,7 @@ STEPS = [
             "крепили на их борта.\n\n"
             "О чём речь?"
         ),
-        "answers": ["ростральные колонны", "ростральные колонны стрелка"],
+        "answers": ["ростральные колонны","Ростральные","ростральные колонны на стрелке"],
     },
     {
         "kind": "media",
@@ -264,6 +268,8 @@ STEPS = [
 ]
 
 
+# ===================== ЛОГИКА ОТПРАВКИ ШАГОВ =====================
+
 async def send_step_prompt(user_id: int):
     state = get_state(user_id)
     idx = state["index"]
@@ -273,16 +279,38 @@ async def send_step_prompt(user_id: int):
     await bot.send_message(user_id, step["prompt"])
 
 
+# ===================== ХЕНДЛЕРЫ =====================
+
 @dp.message_handler(commands=["start"])
 async def handle_start(message: types.Message):
     user_id = message.from_user.id
     user_states[user_id] = {"index": 0}
     greeting = (
         "Штаб ТТ БУБУ:\n\n"
-        "Если ты читаешь это, значит уже нашла конверт в ресторане и готова к операции.\n\n"
+        "Если ты читаешь это, значит уже нашл конверт в ресторане и готов к операции БУ.\n\n"
+        "Твой позывной Валюха"
         "Отвечай на загадки, доезжай до точек, снимай кринж — всё по плану ТТ БУБУ.\n"
+        "Ты можешь использовать транспорт, чтобы перемещаться между локациями"
+        "Делай все сам. Не залезай сразу в интернет и не ищи ответы, так будет веселе и интереснее"
+        "Собрав все артефакты, Штаб ТТ БуБу выдаст контейнер и будет ждать твою реакцию"
     )
+
     await message.answer(greeting)
+
+    # Кнопка «Готов» для получения первого задания
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("Готов", callback_data="ready"))
+
+    await message.answer(
+        "Как будешь морально готов — жми кнопку «Готов», и штаб даст первое задание.",
+        reply_markup=kb,
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data == "ready")
+async def handle_ready(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    await call.answer("Полетели!")
     await send_step_prompt(user_id)
 
 
@@ -322,13 +350,30 @@ async def handle_text(message: types.Message):
 
     normalized = text.lower().strip()
     if normalized in step["answers"]:
+        # подтверждение
         await message.reply("Правильно. Штаб подтверждает.\n")
-        state["index"] += 1
-        await send_step_prompt(user_id)
+
+        # картинка, специфичная для этого шага (если есть)
+        image_path = step.get("image")
+        if image_path:
+            try:
+                await message.answer_photo(InputFile(image_path))
+            except Exception as e:
+                logging.warning(f"Не удалось отправить картинку для шага {idx}: {e}")
+
+        # кнопка «Агент Валюха прибыл на место» для старта следующего этапа
+        kb = InlineKeyboardMarkup()
+        kb.add(InlineKeyboardButton("Агент Валюха прибыл на место", callback_data=f"go:{idx}"))
+
+        await message.answer(
+            "Как будешь на старте следующего этапа — жми «Агент Валюха прибыл на место», "
+            "и штаб зафиксирует начало испытания.",
+            reply_markup=kb,
+        )
     else:
         await message.reply(
             "Ответ не сходится с данными штаба ТТ БУБУ.\n"
-            "Попробуй ещё раз. Можно сформулировать по-другому, но по сути то же место/значение."
+            "Попробуй ещё раз. Можно сформулировать по-другому."
         )
 
 
@@ -352,7 +397,7 @@ async def handle_media(message: types.Message):
 
     await message.reply(
         "Штаб получил твоё медиа.\n"
-        "Передаём ведущему на проверку. Жди решения."
+        "Передаём главнокомандующему на проверку. Жди решения."
     )
 
     caption = (
@@ -374,9 +419,52 @@ async def handle_media(message: types.Message):
     try:
         await message.forward(ADMIN_ID)
     except Exception as e:
-        logging.error(f"Ошибка при пересылке медиа админу: {e}")
+        logging.error(f"Ошибка при пересылке медиа главнокомандующему: {e}")
 
     await bot.send_message(ADMIN_ID, caption, reply_markup=kb)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("go:"))
+async def handle_go(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    state = get_state(user_id)
+
+    try:
+        _, step_idx_str = call.data.split(":")
+        step_idx = int(step_idx_str)
+    except Exception:
+        await call.answer("Ошибка данных.", show_alert=False)
+        return
+
+    if state["index"] != step_idx:
+        await call.answer("Этап уже переключён, едем дальше.", show_alert=False)
+        return
+
+    # фиксируем переход на следующий этап
+    state["index"] += 1
+    new_idx = state["index"]
+
+    await call.answer("Отмечено. Мчишь как надо!")
+
+    # уведомляем админа
+    try:
+        step_name = STEPS[new_idx]["name"] if new_idx < len(STEPS) else "Финал"
+    except Exception:
+        step_name = "Неизвестный этап"
+
+    await bot.send_message(
+        ADMIN_ID,
+        f"Игрок {user_id} нажал «Агент Валюха прибыл на место». Начат этап {new_idx}: {step_name}.",
+    )
+
+    # отправляем игроку следующее задание или финал
+    if new_idx >= len(STEPS):
+        await bot.send_message(
+            user_id,
+            "Квест завершён. Если ведущий рядом — жди вручения контейнера."
+        )
+    else:
+        await send_step_prompt(user_id)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith(("approve:", "reject:")))
@@ -402,7 +490,7 @@ async def handle_approve_reject(call: types.CallbackQuery):
         )
         return
 
-    # Убираем кнопки у сообщения в чате админа
+    # убираем кнопки в сообщении админа
     try:
         await bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
@@ -431,7 +519,6 @@ async def handle_approve_reject(call: types.CallbackQuery):
         state["index"] += 1
         idx = state["index"]
         if idx >= len(STEPS):
-            # Финал
             await bot.send_message(
                 target_user_id,
                 "Квест завершён. Если ведущий рядом — жди вручения контейнера."
@@ -439,6 +526,8 @@ async def handle_approve_reject(call: types.CallbackQuery):
         else:
             await send_step_prompt(target_user_id)
 
+
+# ===================== ЗАПУСК =====================
 
 if __name__ == "__main__":
     print("Bot started...")
