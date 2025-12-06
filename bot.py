@@ -11,7 +11,6 @@ from aiogram.types import (
 
 # ==================== НАСТРОЙКИ ====================
 
-# TODO: подставь реальные значения
 BOT_TOKEN = "8590224138:AAH_GaHndks2jFJjq37vAwSeykbu4mY_m3o"
 ADMIN_ID = 237980454  # твой Telegram ID (узнаётся через @userinfobot)
 
@@ -26,24 +25,24 @@ user_states: Dict[int, Dict[str, Any]] = {}
 # ==================== ШАГИ КВЕСТА ====================
 # Схема:
 # 1) kind = "text_answer" — большая загадка про локацию
-#       prompt: текст загадки
-#       answers: варианты ответа (низкий регистр, без лишних пробелов)
-#       success_text: текст при правильном ответе
-#       image: (опц.) имя файла с картинкой рядом с bot.py
-#       needs_button: True → после правильного ответа даём кнопку "Новое задание"
-#       next_button_text: текст на этой кнопке
-#       retry_text: текст при неправильном ответе
+#        prompt: текст загадки
+#        answers: варианты ответа (низкий регистр, без лишних пробелов)
+#        success_text: текст при правильном ответе
+#        image: (опц.) имя файла с картинкой рядом с bot.py
+#        needs_button: True → после правильного ответа даём кнопку "Новое задание"
+#        next_button_text: текст на этой кнопке
+#        retry_text: текст при неправильном ответе
 #
 # 2) kind = "media" — задание на видео/фото
-#       prompt: текст задания
-#       После того, как АДМИН нажимает "✅ Одобрить", бот переходит к следующему шагу.
+#        prompt: текст задания
+#        После того, как АДМИН нажимает "✅ Одобрить", бот переходит к следующему шагу.
 #
 # 3) kind = "pin_code" — мини-задание с кодом
-#       prompt: текст задания
-#       pins: список допустимых строк
-#       success_text: текст при верном pin
-#       retry_text: текст при неверном
-#       После верного pin бот сразу переходит к следующему шагу (обычно новая text_answer).
+#        prompt: текст задания
+#        pins: список допустимых строк
+#        success_text: текст при верном pin
+#        retry_text: текст при неверном
+#        После верного pin бот сразу переходит к следующему шагу (обычно новая text_answer).
 
 STEPS = [
     # ===== ЦИКЛ 1: ПЛОЩАДЬ ЛЕНИНА =====
@@ -321,7 +320,7 @@ STEPS = [
             "«И сбросил Геракл свои сандалии кожаные, что у Турции\n"
             "за немереные деньги были куплены, и спустился со своим \n"
             "другом Иолаем Николавной в болото, с лернейской гидрой \n"
-            "сражаться. Потому шо в такой грязюке и не такая гадость \n" 
+            "сражаться. Потому шо в такой грязюке и не такая гадость \n"
             "завестись может.»\n\n"
             "Отправь видео сюда. Штаб передаст его ведущему."
         ),
@@ -381,10 +380,10 @@ STEPS = [
             "Чтобы Штаб отправил агента на вручение контейнера нажми - Получить ГРУЗ.»."
         ),
     },
-    
 ]
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
 
 def get_state(user_id: int) -> Dict[str, Any]:
     if user_id not in user_states:
@@ -417,7 +416,7 @@ async def handle_start(message: types.Message):
     user_states[user_id] = {"index": 0, "waiting_next_button": False}
 
     greeting = (
-       "Если ты читаешь это, значит уже нашел конверт в ресторане и готов к операции БУ.\n\n"
+        "Если ты читаешь это, значит уже нашел конверт в ресторане и готов к операции БУ.\n\n"
         "Твой позывной Валюха\n"
         "Отвечай на загадки, доезжай до точек, снимай видео — всё по плану ТТ БУБУ.\n"
         "Ты можешь использовать транспорт, чтобы перемещаться между локациями\n"
@@ -500,8 +499,7 @@ async def handle_text(message: types.Message):
         answers = [a.lower() for a in step.get("answers", [])]
 
         if normalized in answers:
-      
-    # ==== Картинка ====      
+            # ==== Картинка ====
             image_name = step.get("image")
             if image_name:
                 try:
@@ -511,7 +509,7 @@ async def handle_text(message: types.Message):
                     await message.answer(
                         "(Штаб пытался отправить картинку, но контейнер где-то застрял.)"
                     )
-    # ==== Текст ====
+            # ==== Текст ====
             success_text = step.get("success_text", "Верно. Штаб подтверждает.")
             await message.answer(success_text)
 
@@ -611,84 +609,82 @@ async def handle_approve_reject(call: types.CallbackQuery):
         await call.answer("Ты не ведущий ТТ БУБУ.")
         return
 
-try:
-    action, user_id_str, step_idx_str = call.data.split(":")
-    target_user_id = int(user_id_str)
-    step_idx = int(step_idx_str)
-except Exception:
-    await call.answer("Некорректные данные callback.", show_alert=True)
-    return
+    try:
+        action, user_id_str, step_idx_str = call.data.split(":")
+        target_user_id = int(user_id_str)
+        step_idx = int(step_idx_str)
+    except Exception:
+        await call.answer("Некорректные данные callback.", show_alert=True)
+        return
 
-state = get_state(target_user_id)
+    state = get_state(target_user_id)
 
-# Проверим, что игрок всё ещё на этом шаге
-if state["index"] != step_idx:
-    await call.answer(
-        f"Игрок уже на другом шаге (текущий шаг: {state['index']}).",
-        show_alert=False,
-    )
-    return
-
-# Уберём кнопки у сообщения с approve/reject
-try:
-    await bot.edit_message_reply_markup(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        reply_markup=None,
-    )
-except Exception:
-    pass
-
-# ====== ОТКЛОНЕНО ======
-if action == "reject":
-    await call.answer("Попросили переснять.")
-    await bot.send_message(
-        target_user_id,
-        "Штаб ТТ БУБУ: Митяй попросил переснять медиа.\n"
-        "Попробуй ещё раз — поближе, чётче и с харизмой Валюхи."
-    )
-    return
-
-# ====== ОДОБРЕНО ======
-if action == "approve":
-    await call.answer("Одобрено.")
-    await bot.send_message(
-        target_user_id,
-        "Штаб ТТ БУБУ: медиа одобрено."
-    )
-
-    idx = state["index"]
-
-    # ЕСЛИ ЭТО ПОСЛЕДНИЙ ШАГ (ФИНАЛЬНОЕ ФОТО У ЁЛКИ)
-    if idx == len(STEPS) - 1:
-        keyboard = InlineKeyboardMarkup()
-        keyboard.add(
-            InlineKeyboardButton(
-                "Получить приз",
-                callback_data="get_prize"
-            )
+    # Проверим, что игрок всё ещё на этом шаге
+    if state["index"] != step_idx:
+        await call.answer(
+            f"Игрок уже на другом шаге (текущий шаг: {state['index']}).",
+            show_alert=False,
         )
+        return
 
+    # Уберём кнопки у сообщения с approve/reject
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=None,
+        )
+    except Exception:
+        pass
+
+    # ====== ОТКЛОНЕНО ======
+    if action == "reject":
+        await call.answer("Попросили переснять.")
         await bot.send_message(
             target_user_id,
-            "Все этапы пройдены! Нажми «Получить приз», чтобы штаб отправил агента для выдачи.",
-            reply_markup=keyboard,
+            "Штаб ТТ БУБУ: Митяй попросил переснять медиа.\n"
+            "Попробуй ещё раз — поближе, чётче и с харизмой Валюхи."
+        )
+        return
+
+    # ====== ОДОБРЕНО ======
+    if action == "approve":
+        await call.answer("Одобрено.")
+        await bot.send_message(
+            target_user_id,
+            "Штаб ТТ БУБУ: медиа одобрено."
         )
 
-        # Можно повысить индекс, чтобы дальше бот считал, что квест завершён
-        state["index"] += 1
+        idx = state["index"]
 
-    else:
-        # Обычное поведение для НЕ последнего шага:
-        # после одобрения видео двигаемся к следующему шагу (обычно PIN-код)
-        state["index"] += 1
-        await send_step_prompt(target_user_id)
-# ==================== ЗАПУСК ====================
+        # ЕСЛИ ЭТО ПОСЛЕДНИЙ ШАГ (ФИНАЛЬНОЕ ФОТО У ЁЛКИ)
+        if idx == len(STEPS) - 1:
+            keyboard = InlineKeyboardMarkup()
+            keyboard.add(
+                InlineKeyboardButton(
+                    "Получить приз",
+                    callback_data="get_prize"
+                )
+            )
 
-if __name__ == "__main__":
-    print("Bot started...")
-    executor.start_polling(dp, skip_updates=True)
+            await bot.send_message(
+                target_user_id,
+                "Все этапы пройдены! Нажми «Получить приз», чтобы штаб отправил агента для выдачи.",
+                reply_markup=keyboard,
+            )
+
+            # Можно повысить индекс, чтобы дальше бот считал, что квест завершён
+            state["index"] += 1
+
+        else:
+            # Обычное поведение для НЕ последнего шага:
+            # после одобрения видео двигаемся к следующему шагу (обычно PIN-код)
+            state["index"] += 1
+            await send_step_prompt(target_user_id)
+
+
 # ==================== Приз ====================
+
 @dp.callback_query_handler(lambda c: c.data == "get_prize")
 async def handle_prize(call: types.CallbackQuery):
     user_id = call.from_user.id
@@ -701,3 +697,10 @@ async def handle_prize(call: types.CallbackQuery):
     except Exception as e:
         logging.error(e)
         await bot.send_message(user_id, "Ошибка при отправке приза. Сообщи ведущему.")
+
+
+# ==================== ЗАПУСК ====================
+
+if __name__ == "__main__":
+    print("Bot started...")
+    executor.start_polling(dp, skip_updates=True)
