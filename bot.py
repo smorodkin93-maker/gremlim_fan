@@ -244,7 +244,7 @@ STEPS = [
             "petro primo catharina secunda",
             "Petro Primo Catharina Secunda",
             "Petro primo Catharina secunda",
-            "Petro primo catharina secunda.",
+            "Petro primo catharina secunda."
         ],
         "success_text": (
             "Надпись совпала с данными штаба. Валюха, ты хорошо работаешь.\n"
